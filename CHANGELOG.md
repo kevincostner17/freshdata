@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **Outliers: an explicit `outlier_action` is now honored.** Under the default
+  `strategy="balanced"`, `outlier_action="cap"` (and `"remove"`) was silently
+  downgraded to `"flag"`, so capping never happened despite being the documented
+  default — extreme values were returned unchanged. Explicit
+  `"cap"` / `"remove"` / `"flag"` are now applied to every eligible numeric
+  column.
+- **Small frames no longer skip outlier handling.** The engine's minimum
+  non-null threshold dropped from 10 to 4 (the floor at which IQR / z-score
+  fences are defined), so outliers in small DataFrames are detected and handled.
+
+### Changed
+- The default `outlier_action` is now `"auto"` (context-aware: flags under
+  `balanced`, caps under `aggressive`, flags heavy-tailed >15%-outlying
+  columns). The default *behavior* under `balanced` is unchanged (still flags);
+  only the explicit-directive path changed. An explicit `cap` / `remove` on a
+  heavy-tailed column now caps / removes and emits a warning instead of silently
+  flagging.
+
 ## [1.0.0] - 2026-06-14
 
 First stable release. The public API is now considered **stable under Semantic

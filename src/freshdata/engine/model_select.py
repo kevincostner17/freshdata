@@ -16,6 +16,9 @@ EngineMode = Literal["balanced", "aggressive"]
 _MEAN_OK_SKEW = 0.5
 _KNN_MIN_CORR = 0.4
 _KNN_ROW_LIMIT = 10_000
+#: Outlier share above which "auto" treats a column as heavy-tailed and flags
+#: rather than caps (kept in sync with engine.outliers._HEAVY_TAIL_SHARE).
+_HEAVY_TAIL_SHARE = 0.15
 
 
 @dataclass(frozen=True)
@@ -167,18 +170,29 @@ def select_outlier_action(
     mode: EngineMode,
     share: float,
 ) -> tuple[str | None, ModelChoice]:
-    """Choose outlier action; returns (action or None for preserve, primary choice)."""
+    """Choose the outlier action; returns ``(action or None, primary choice)``.
+
+    ``None`` means "detect but preserve". Protected columns (id / target /
+    domain-sensitive) are always preserved. ``outlier_action="auto"`` (the
+    default) is context-aware — it flags under ``mode="balanced"`` and caps
+    under ``"aggressive"``, and flags heavy-tailed columns (>15% outlying)
+    rather than rewriting real data. An explicit ``"cap"`` / ``"remove"`` /
+    ``"flag"`` is honored as a directive on every eligible column; the caller
+    raises a warning when a directive acts on a heavy-tailed column.
+    """
     if ctx.role in ("id", "target") or ctx.domain_sensitive:
         return None, ModelChoice("preserve", 0.95, "protected column role or domain")
-    if config.outlier_action is None:
-        return None, ModelChoice("preserve", 1.0, "outlier_action=None")
-    if share > 0.15:
-        return "flag", ModelChoice("flag", 0.9, "heavy-tailed distribution (>15% outlying)")
     action = config.outlier_action
-    if mode == "balanced" and action == "cap":
-        return "flag", ModelChoice("flag", 0.85, "balanced mode flags rather than caps")
-    if action == "cap" and share <= 0.02:
-        return "cap", ModelChoice("cap", 0.85, "low outlier share")
-    if action == "cap":
-        return "cap", ModelChoice("cap", 0.7, "winsorization to detection fences")
-    return action, ModelChoice(str(action), 0.8, f"configured outlier_action={action!r}")
+    if action is None:
+        return None, ModelChoice("preserve", 1.0, "outlier_action=None")
+    if action == "auto":
+        if share > _HEAVY_TAIL_SHARE:  # heavy-tailed: the extremes are likely real
+            return "flag", ModelChoice("flag", 0.9,
+                                       "heavy-tailed distribution (>15% outlying)")
+        if mode == "balanced":
+            return "flag", ModelChoice("flag", 0.85, "balanced mode flags rather than caps")
+        conf = 0.85 if share <= 0.02 else 0.7
+        return "cap", ModelChoice("cap", conf, "aggressive mode winsorizes to fences")
+    # Explicit directive ("cap" / "remove" / "flag") — honor it on every column.
+    conf = 0.85 if share <= 0.02 else 0.7
+    return action, ModelChoice(str(action), conf, f"explicit outlier_action={action!r}")

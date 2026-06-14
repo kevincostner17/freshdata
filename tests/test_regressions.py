@@ -56,6 +56,36 @@ def test_fraud_column_outliers_not_capped():
     assert out["fraud_score"].max() == before_max
 
 
+def test_explicit_cap_winsorizes_numeric_outliers():
+    # Regression for the v1.0 bug: fd.clean(..., outlier_action="cap") returned
+    # extreme values unchanged under the default balanced strategy because the
+    # engine silently downgraded "cap" to "flag".
+    data = {
+        "Name": ["Alice ", "bob", np.nan, "Charlie", "D@vid", "Eve", "Zoe"],
+        "Age": ["25", "thirty", "40", np.nan, "22", "NaN", "999"],
+        "Salary": ["50000", "sixty thousand", np.nan, "70000", "80000", "90000",
+                   "10000000"],
+        "JoinDate": ["2020-01-10", "2021/02/15", "March 3, 2022", "2020-13-01", "",
+                     "2022-07-25", "2019-05-20"],
+        "Department": ["HR", "IT", "Finance", "finance", "IT ", np.nan, "HR"],
+        "x": [1, 200, 3, 4, 5, 70, 2],
+    }
+    out = fd.clean(pd.DataFrame(data), impute="auto", outlier_method="iqr",
+                   outlier_action="cap", verbose=False)
+    # The genuinely-numeric column is capped to its IQR upper fence (200 -> 90).
+    assert out["x"].max() == 90
+    assert 200 not in set(out["x"])
+    assert "x_outlier" not in out.columns   # capped, not flagged
+    assert len(out) == 7                     # winsorize keeps every row
+    # Scope boundary: Age/Salary stay object dtype (failed 0.95 numeric coercion
+    # on "thirty"/"sixty thousand"), so their extreme *string* values are not
+    # capped — capping requires a numeric column.
+    assert not pd.api.types.is_numeric_dtype(out["age"])
+    assert "999" in set(out["age"].astype(str))
+    assert not pd.api.types.is_numeric_dtype(out["salary"])
+    assert "10000000" in set(out["salary"].astype(str))
+
+
 def test_survey_notes_never_force_filled():
     df = load_fixture("survey_responses")
     before_missing = df["notes"].isna().sum()
