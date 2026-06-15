@@ -6,15 +6,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [1.0.1] - 2026-06-15
-
 ### Fixed
-- **Config: single-string tuple fields no longer split into characters.** Passing
-  `id_columns="sku_num"`, `preserve_columns="notes"`, `duplicate_subset="id"`, or
-  `extra_sentinels="missing"` was passed through `tuple()` directly, producing
-  per-character tuples (`('s','k','u',…)`). ID protection, column preservation,
-  duplicate subsetting, and custom sentinels now work when a single name is given
-  as a string.
 - **Outliers: an explicit `outlier_action` is now honored.** Under the default
   `strategy="balanced"`, `outlier_action="cap"` (and `"remove"`) was silently
   downgraded to `"flag"`, so capping never happened despite being the documented
