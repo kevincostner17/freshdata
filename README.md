@@ -391,6 +391,9 @@ MIT — see [LICENSE](LICENSE).
 Built and maintained by **Johnny Wilson Dougherty**
 ([@JohnnyWilson-Portfolio](https://github.com/JohnnyWilson-Portfolio)).
 
+Contributions by **Kevin Costner**
+([@kevincostner17](https://github.com/kevincostner17)).
+
 If `freshdata` saves you time, please ⭐ the
 [repository](https://github.com/FreshCode-Org/freshdata) — it genuinely helps
 others discover the project.
